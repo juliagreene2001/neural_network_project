@@ -17,10 +17,16 @@ class SimpleSLPRegressor(BaseSLPEstimator):
 
     def __init__(
         self,
-        hidden_layer_size: int = 100,
-        activation: str = "logistic",
-        learning_rate: float = 0.001,
+        hidden_layer_sizes: tuple[int, ...] = (100,),
+        activation: str = "relu",
+        optimizer: str = "adam",
+        learning_rate: float = 0.01,
         max_iter: int = 200,
+        tol: float = 1e-4,
+        n_iter_no_change: int = 10,
+        adam_beta1: float = 0.9,
+        adam_beta2: float = 0.999,
+        adam_epsilon: float = 1e-8,
         random_state: Optional[int] = None,
     ) -> None:
         """
@@ -28,76 +34,50 @@ class SimpleSLPRegressor(BaseSLPEstimator):
 
         Parameters:
         -----------
-        hidden_layer_size : int
-            Number of neurons in the hidden layer
+        hidden_layer_sizes : tuple of int
+            Number of neurons in each hidden layer, e.g. (100,) for one hidden layer
         activation : str
-            Activation function ('identity', 'logistic', 'tanh', 'relu'}, default='logistic')
+            Activation function ('logistic', 'tanh', 'relu'), default='relu'
+        optimizer : str
+            Optimization algorithm ('sgd' or 'adam'), default='adam'
         learning_rate : float
-            Learning rate for gradient descent
+            Learning rate (step size) for the optimizer
         max_iter : int
             Maximum number of iterations
+        tol : float
+            Minimum loss improvement to count as progress (early stopping)
+        n_iter_no_change : int
+            Iterations without improvement before stopping early
+        adam_beta1 : float
+            Adam exponential decay rate for the first moment estimate, default=0.9
+        adam_beta2 : float
+            Adam exponential decay rate for the second moment estimate, default=0.999
+        adam_epsilon : float
+            Adam numerical stability constant, default=1e-8
         random_state : int or None
             Random seed for reproducibility
         """
         super().__init__(
-            hidden_layer_size, activation, learning_rate, max_iter, random_state
+            hidden_layer_sizes, activation, optimizer, learning_rate, max_iter,
+            tol, n_iter_no_change, adam_beta1, adam_beta2, adam_epsilon, random_state,
         )
 
-    def _forward_propagation(self, X: NDArray[np.floating]) -> Tuple[
-        NDArray[np.floating],
-        NDArray[np.floating],
-        NDArray[np.floating],
-        NDArray[np.floating],
-    ]:
-        """
-        Perform forward propagation.
-
-        Parameters:
-        -----------
-        X : array-like, shape (n_samples, n_features)
-            Input data
-
-        Returns:
-        --------
-        z1, a1, z2, y_pred : tuple of arrays
-            Intermediate values for backpropagation
-        """
-        # TODO: Implement forward propagation
-        pass
-
-    def _backward_propagation(
-        self,
-        X: NDArray[np.floating],
-        y: NDArray[np.floating],
-        z1: NDArray[np.floating],
-        a1: NDArray[np.floating],
-        z2: NDArray[np.floating],
-        y_pred: NDArray[np.floating],
+    def _forward_propagation(
+        self, X: NDArray[np.floating]
     ) -> Tuple[
-        NDArray[np.floating],
-        NDArray[np.floating],
-        NDArray[np.floating],
+        list[NDArray[np.floating]],
+        list[NDArray[np.floating]],
         NDArray[np.floating],
     ]:
         """
-        Perform backpropagation to compute gradients.
+        Perform forward propagation through hidden layers then linear output.
 
-        Parameters:
-        -----------
-        X : array-like, shape (n_samples, n_features)
-            Input data
-        y : array-like, shape (n_samples, n_outputs)
-            Target values
-        z1, a1, z2, y_pred : arrays
-            Values from forward propagation
-
-        Returns:
-        --------
-        dW1, db1, dW2, db2 : tuple of arrays
-            Gradients for weights and biases
+        Returns (activations, pre_activations, y_pred) where activations[0] is X
+        and y_pred is the raw linear output for regression.
         """
-        # TODO: Implement backpropagation for MSE loss
-        pass
+        activations, pre_activations = self._forward_hidden_layers(X)
+        y_pred = activations[-1] @ self.weights_[-1] + self.biases_[-1]
+        return activations, pre_activations, y_pred
 
     def _compute_loss(
         self, y_true: NDArray[np.floating], y_pred: NDArray[np.floating]
@@ -117,8 +97,7 @@ class SimpleSLPRegressor(BaseSLPEstimator):
         loss : float
             MSE loss
         """
-        # TODO: Implement MSE
-        pass
+        return float(np.mean((y_pred - y_true) ** 2))
 
     def fit(
         self, X: NDArray[np.floating], y: NDArray[np.floating]
@@ -138,8 +117,16 @@ class SimpleSLPRegressor(BaseSLPEstimator):
         self : object
             Fitted estimator
         """
-        # TODO: Implement training loop (similar to classifier)
-        pass
+        if self.random_state is not None:
+            np.random.seed(self.random_state)
+
+        y = np.atleast_2d(y).T if y.ndim == 1 else y
+        n_outputs = y.shape[1]
+
+        self._initialize_weights(X.shape[1], n_outputs)
+        self._run_training_loop(X, y)
+
+        return self
 
     def predict(self, X: NDArray[np.floating]) -> NDArray[np.floating]:
         """
@@ -155,8 +142,8 @@ class SimpleSLPRegressor(BaseSLPEstimator):
         y_pred : array-like, shape (n_samples,) or (n_samples, n_outputs)
             Predicted values
         """
-        # TODO: Implement prediction
-        pass
+        _, _, y_pred = self._forward_propagation(X)
+        return y_pred.squeeze()
 
     def score(self, X: NDArray[np.floating], y: NDArray[np.floating]) -> float:
         """
@@ -174,5 +161,7 @@ class SimpleSLPRegressor(BaseSLPEstimator):
         score : float
             R² score
         """
-        # TODO: Implement R² score
-        pass
+        y_pred = self.predict(X)
+        ss_res = np.sum((y - y_pred) ** 2)
+        ss_tot = np.sum((y - np.mean(y, axis=0)) ** 2)
+        return 1 - ss_res / ss_tot if ss_tot > 0 else 0.0

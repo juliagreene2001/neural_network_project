@@ -74,10 +74,10 @@ class TestClassifier:
 
     def test_initialization(self):
         clf = SimpleSLPClassifier(
-            hidden_layer_size=50, activation="relu",
+            hidden_layer_sizes=(50,), activation="relu",
             learning_rate=0.01, max_iter=100, random_state=42,
         )
-        assert clf.hidden_layer_size == 50
+        assert clf.hidden_layer_sizes == (50,)
         assert clf.activation == "relu"
         assert clf.learning_rate == 0.01
         assert clf.max_iter == 100
@@ -85,16 +85,16 @@ class TestClassifier:
 
     def test_weight_shapes(self, binary_data):
         X_train, _, y_train, _ = binary_data
-        clf = SimpleSLPClassifier(hidden_layer_size=20, max_iter=100, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(20,), max_iter=100, random_state=42)
         clf.fit(X_train, y_train)
-        assert clf.W1_.shape == (X_train.shape[1], 20)
-        assert clf.b1_.shape == (20,)
-        assert clf.W2_.shape[0] == 20
-        assert clf.b2_.shape[0] == clf.n_outputs_
+        assert clf.weights_[0].shape == (X_train.shape[1], 20)
+        assert clf.biases_[0].shape == (20,)
+        assert clf.weights_[1].shape[0] == 20
+        assert clf.biases_[1].shape[0] == clf.n_outputs_
 
     def test_predict_shape_and_labels(self, binary_data):
         X_train, X_test, y_train, _ = binary_data
-        clf = SimpleSLPClassifier(hidden_layer_size=20, max_iter=100, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(20,), max_iter=100, random_state=42)
         clf.fit(X_train, y_train)
         predictions = clf.predict(X_test)
         assert predictions.shape == (X_test.shape[0],)
@@ -102,7 +102,7 @@ class TestClassifier:
 
     def test_predict_proba(self, binary_data):
         X_train, X_test, y_train, _ = binary_data
-        clf = SimpleSLPClassifier(hidden_layer_size=20, max_iter=100, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(20,), max_iter=100, random_state=42)
         clf.fit(X_train, y_train)
         proba = clf.predict_proba(X_test)
         assert proba.shape == (X_test.shape[0], len(np.unique(y_train)))
@@ -113,21 +113,21 @@ class TestClassifier:
 
     def test_score(self, binary_data):
         X_train, X_test, y_train, y_test = binary_data
-        clf = SimpleSLPClassifier(hidden_layer_size=30, max_iter=200, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(30,), max_iter=200, random_state=42)
         clf.fit(X_train, y_train)
         assert clf.score(X_test, y_test) > 0.6
 
     def test_loss_decreases(self, binary_data):
         X_train, _, y_train, _ = binary_data
         clf = SimpleSLPClassifier(
-            hidden_layer_size=30, learning_rate=0.01, max_iter=200, random_state=42
+            hidden_layer_sizes=(30,), learning_rate=0.01, max_iter=200, random_state=42
         )
         clf.fit(X_train, y_train)
         assert clf.loss_curve_[-1] < clf.loss_curve_[0]
 
     def test_multiclass(self, multiclass_data):
         X_train, X_test, y_train, y_test = multiclass_data
-        clf = SimpleSLPClassifier(hidden_layer_size=40, max_iter=300, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(40,), max_iter=300, random_state=42)
         clf.fit(X_train, y_train)
         assert len(clf.classes_) == 3
         assert clf.score(X_test, y_test) > 0.5
@@ -137,7 +137,7 @@ class TestClassifier:
         X_train, X_test, y_train, y_test = binary_data
         for activation in ["relu", "tanh", "logistic"]:
             clf = SimpleSLPClassifier(
-                hidden_layer_size=20, activation=activation,
+                hidden_layer_sizes=(20,), activation=activation,
                 max_iter=100, random_state=42,
             )
             clf.fit(X_train, y_train)
@@ -145,19 +145,19 @@ class TestClassifier:
 
     def test_reproducibility(self, binary_data):
         X_train, X_test, y_train, _ = binary_data
-        clf1 = SimpleSLPClassifier(hidden_layer_size=20, max_iter=100, random_state=42)
+        clf1 = SimpleSLPClassifier(hidden_layer_sizes=(20,), max_iter=100, random_state=42)
         clf1.fit(X_train, y_train)
-        clf2 = SimpleSLPClassifier(hidden_layer_size=20, max_iter=100, random_state=42)
+        clf2 = SimpleSLPClassifier(hidden_layer_sizes=(20,), max_iter=100, random_state=42)
         clf2.fit(X_train, y_train)
         np.testing.assert_array_equal(clf1.predict(X_test), clf2.predict(X_test))
 
     def test_different_seeds_different_weights(self, binary_data):
         X_train, _, y_train, _ = binary_data
-        clf1 = SimpleSLPClassifier(hidden_layer_size=20, max_iter=100, random_state=42)
+        clf1 = SimpleSLPClassifier(hidden_layer_sizes=(20,), max_iter=100, random_state=42)
         clf1.fit(X_train, y_train)
-        clf2 = SimpleSLPClassifier(hidden_layer_size=20, max_iter=100, random_state=123)
+        clf2 = SimpleSLPClassifier(hidden_layer_sizes=(20,), max_iter=100, random_state=123)
         clf2.fit(X_train, y_train)
-        assert not np.allclose(clf1.W1_, clf2.W1_)
+        assert not np.allclose(clf1.weights_[0], clf2.weights_[0])
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ class TestClassifierProblems:
         X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=float)
         y = np.array([0, 0, 1, 1])
         clf = SimpleSLPClassifier(
-            hidden_layer_size=5, activation="relu",
+            hidden_layer_sizes=(5,), activation="relu",
             learning_rate=0.1, max_iter=100, random_state=42,
         )
         clf.fit(X, y)
@@ -182,7 +182,7 @@ class TestClassifierProblems:
         """When all labels are the same, should predict that class."""
         X = np.random.randn(20, 3)
         y = np.zeros(20, dtype=int)
-        clf = SimpleSLPClassifier(hidden_layer_size=5, max_iter=50, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(5,), max_iter=50, random_state=42)
         clf.fit(X, y)
         assert np.all(clf.predict(X) == 0)
 
@@ -191,7 +191,7 @@ class TestClassifierProblems:
         X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=float)
         y = np.array([0, 1, 1, 0])
         clf = SimpleSLPClassifier(
-            hidden_layer_size=10, activation="relu",
+            hidden_layer_sizes=(10,), activation="relu",
             learning_rate=0.1, max_iter=500, random_state=42,
         )
         clf.fit(X, y)
@@ -207,10 +207,10 @@ class TestRegressor:
 
     def test_initialization(self):
         reg = SimpleSLPRegressor(
-            hidden_layer_size=50, activation="relu",
+            hidden_layer_sizes=(50,), activation="relu",
             learning_rate=0.01, max_iter=100, random_state=42,
         )
-        assert reg.hidden_layer_size == 50
+        assert reg.hidden_layer_sizes == (50,)
         assert reg.activation == "relu"
         assert reg.learning_rate == 0.01
         assert reg.max_iter == 100
@@ -218,7 +218,7 @@ class TestRegressor:
 
     def test_predict_shape_and_finite(self, regression_data):
         X_train, X_test, y_train, _ = regression_data
-        reg = SimpleSLPRegressor(hidden_layer_size=20, max_iter=100, random_state=42)
+        reg = SimpleSLPRegressor(hidden_layer_sizes=(20,), max_iter=100, random_state=42)
         reg.fit(X_train, y_train)
         predictions = reg.predict(X_test)
         assert predictions.shape == (X_test.shape[0],)
@@ -227,7 +227,7 @@ class TestRegressor:
     def test_score(self, regression_data):
         X_train, X_test, y_train, y_test = regression_data
         reg = SimpleSLPRegressor(
-            hidden_layer_size=30, learning_rate=0.01, max_iter=300, random_state=42
+            hidden_layer_sizes=(30,), learning_rate=0.01, max_iter=300, random_state=42
         )
         reg.fit(X_train, y_train)
         assert reg.score(X_test, y_test) > 0.5
@@ -235,7 +235,7 @@ class TestRegressor:
     def test_loss_decreases(self, regression_data):
         X_train, _, y_train, _ = regression_data
         reg = SimpleSLPRegressor(
-            hidden_layer_size=30, learning_rate=0.01, max_iter=200, random_state=42
+            hidden_layer_sizes=(30,), learning_rate=0.01, max_iter=200, random_state=42
         )
         reg.fit(X_train, y_train)
         assert reg.loss_curve_[-1] < reg.loss_curve_[0]
@@ -245,7 +245,7 @@ class TestRegressor:
         X = np.random.randn(30, 3)
         y = np.ones(30) * 5.0
         reg = SimpleSLPRegressor(
-            hidden_layer_size=5, learning_rate=0.01, max_iter=100, random_state=42
+            hidden_layer_sizes=(5,), optimizer="sgd", learning_rate=0.01, max_iter=100, random_state=42
         )
         reg.fit(X, y)
         assert 4.0 < np.mean(reg.predict(X)) < 6.0
@@ -259,7 +259,7 @@ class TestRegressor:
             X, y, test_size=0.3, random_state=42
         )
         reg = SimpleSLPRegressor(
-            hidden_layer_size=20, learning_rate=0.01, max_iter=300, random_state=42
+            hidden_layer_sizes=(20,), learning_rate=0.01, max_iter=300, random_state=42
         )
         reg.fit(X_train, y_train)
         assert reg.score(X_test, y_test) > 0.8
@@ -274,37 +274,37 @@ class TestEdgeCases:
 
     def test_single_feature(self):
         X, y = np.random.randn(20, 1), np.random.randint(0, 2, 20)
-        clf = SimpleSLPClassifier(hidden_layer_size=3, max_iter=50, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(3,), max_iter=50, random_state=42)
         clf.fit(X, y)
         assert clf.predict(X).shape == (20,)
 
     def test_many_features(self):
         X, y = np.random.randn(30, 50), np.random.randint(0, 2, 30)
-        clf = SimpleSLPClassifier(hidden_layer_size=5, max_iter=20, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(5,), max_iter=20, random_state=42)
         clf.fit(X, y)
         assert clf.predict(X).shape == (30,)
 
     def test_single_sample_prediction(self):
         X, y = make_classification(n_samples=100, n_features=5, random_state=42)
-        clf = SimpleSLPClassifier(hidden_layer_size=10, max_iter=100, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(10,), max_iter=100, random_state=42)
         clf.fit(X, y)
         assert clf.predict(X[0:1]).shape == (1,)
 
     def test_small_hidden_layer(self):
         X, y = make_classification(n_samples=100, n_features=5, random_state=42)
-        clf = SimpleSLPClassifier(hidden_layer_size=2, max_iter=100, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(2,), max_iter=100, random_state=42)
         clf.fit(X, y)
         assert 0 <= clf.score(X, y) <= 1
 
     def test_large_hidden_layer(self):
         X, y = make_classification(n_samples=100, n_features=5, random_state=42)
-        clf = SimpleSLPClassifier(hidden_layer_size=200, max_iter=50, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(200,), max_iter=50, random_state=42)
         clf.fit(X, y)
         assert 0 <= clf.score(X, y) <= 1
 
     def test_regressor_minimal_data(self):
         X, y = np.array([[1.0], [2.0]]), np.array([1.0, 2.0])
-        reg = SimpleSLPRegressor(hidden_layer_size=3, max_iter=100, random_state=42)
+        reg = SimpleSLPRegressor(hidden_layer_sizes=(3,), max_iter=100, random_state=42)
         reg.fit(X, y)
         assert reg.predict(X).shape == (2,)
 
@@ -331,7 +331,7 @@ class TestIntegration:
         X_test = scaler.transform(X_test)
 
         clf = SimpleSLPClassifier(
-            hidden_layer_size=30, activation="relu",
+            hidden_layer_sizes=(30,), activation="relu",
             learning_rate=0.01, max_iter=200, random_state=42,
         )
         clf.fit(X_train, y_train)
@@ -350,7 +350,7 @@ class TestIntegration:
         X_test = scaler.transform(X_test)
 
         reg = SimpleSLPRegressor(
-            hidden_layer_size=30, activation="relu",
+            hidden_layer_sizes=(30,), activation="relu",
             learning_rate=0.01, max_iter=300, random_state=42,
         )
         reg.fit(X_train, y_train)

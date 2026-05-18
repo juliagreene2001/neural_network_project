@@ -18,10 +18,16 @@ class SimpleSLPClassifier(BaseSLPEstimator):
 
     def __init__(
         self,
-        hidden_layer_size: int = 100,
-        activation: str = "logistic",
-        learning_rate: float = 0.001,
+        hidden_layer_sizes: tuple[int, ...] = (100,),
+        activation: str = "relu",
+        optimizer: str = "adam",
+        learning_rate: float = 0.01,
         max_iter: int = 200,
+        tol: float = 1e-4,
+        n_iter_no_change: int = 10,
+        adam_beta1: float = 0.9,
+        adam_beta2: float = 0.999,
+        adam_epsilon: float = 1e-8,
         random_state: Optional[int] = None,
     ) -> None:
         """
@@ -29,83 +35,54 @@ class SimpleSLPClassifier(BaseSLPEstimator):
 
         Parameters:
         -----------
-        hidden_layer_size : int
-            Number of neurons in the hidden layer
+        hidden_layer_sizes : tuple of int
+            Number of neurons in each hidden layer, e.g. (100,) for one hidden layer
         activation : str
-            Activation function ('identity', 'logistic', 'tanh', 'relu'}, default='logistic')
+            Activation function ('logistic', 'tanh', 'relu'), default='relu'
+        optimizer : str
+            Optimization algorithm ('sgd' or 'adam'), default='adam'
         learning_rate : float
-            Learning rate for gradient descent
+            Learning rate (step size) for the optimizer
         max_iter : int
             Maximum number of iterations
+        tol : float
+            Minimum loss improvement to count as progress (early stopping)
+        n_iter_no_change : int
+            Iterations without improvement before stopping early
+        adam_beta1 : float
+            Adam exponential decay rate for the first moment estimate, default=0.9
+        adam_beta2 : float
+            Adam exponential decay rate for the second moment estimate, default=0.999
+        adam_epsilon : float
+            Adam numerical stability constant, default=1e-8
         random_state : int or None
             Random seed for reproducibility
         """
         super().__init__(
-            hidden_layer_size, activation, learning_rate, max_iter, random_state
+            hidden_layer_sizes, activation, optimizer, learning_rate, max_iter,
+            tol, n_iter_no_change, adam_beta1, adam_beta2, adam_epsilon, random_state,
         )
 
         # Classifier-specific attributes
-        self.classes_: Optional[NDArray[np.int_]] = None  # Unique class labels
-        self.n_outputs_: Optional[int] = None  # Number of output neurons
+        self.classes_: Optional[NDArray[np.int_]] = None
+        self.n_outputs_: Optional[int] = None
 
-    def _forward_propagation(self, X: NDArray[np.floating]) -> Tuple[
-        NDArray[np.floating],
-        NDArray[np.floating],
-        NDArray[np.floating],
-        NDArray[np.floating],
-    ]:
-        """
-        Perform forward propagation.
-
-        Parameters:
-        -----------
-        X : array-like, shape (n_samples, n_features)
-            Input data
-
-        Returns:
-        --------
-        z1, a1, z2, y_pred : tuple of arrays
-            Intermediate values for backpropagation
-        """
-        # TODO: Implement forward propagation
-        pass
-
-    def _backward_propagation(
-        self,
-        X: NDArray[np.floating],
-        y: NDArray[np.floating],
-        z1: NDArray[np.floating],
-        a1: NDArray[np.floating],
-        z2: NDArray[np.floating],
-        y_pred: NDArray[np.floating],
+    def _forward_propagation(
+        self, X: NDArray[np.floating]
     ) -> Tuple[
-        NDArray[np.floating],
-        NDArray[np.floating],
-        NDArray[np.floating],
+        list[NDArray[np.floating]],
+        list[NDArray[np.floating]],
         NDArray[np.floating],
     ]:
         """
-        Perform backpropagation to compute gradients.
+        Perform forward propagation through hidden layers then softmax output.
 
-        Parameters:
-        -----------
-        X : array-like, shape (n_samples, n_features)
-            Input data
-        y : array-like, shape (n_samples, n_outputs)
-            One-hot encoded target
-        z1, a1, z2, y_pred : arrays
-            Values from forward propagation
-
-        Returns:
-        --------
-        dW1, db1, dW2, db2 : tuple of arrays
-            Gradients for weights and biases
+        Returns (activations, pre_activations, y_pred) where activations[0] is X
+        and y_pred is the softmax probability distribution.
         """
-        # TODO: Implement backpropagation
-        # Compute output layer error
-        # Compute hidden layer error
-        # Compute gradients
-        pass
+        activations, pre_activations = self._forward_hidden_layers(X)
+        y_pred = softmax(activations[-1] @ self.weights_[-1] + self.biases_[-1])
+        return activations, pre_activations, y_pred
 
     def _compute_loss(
         self, y_true: NDArray[np.floating], y_pred: NDArray[np.floating]
@@ -125,9 +102,8 @@ class SimpleSLPClassifier(BaseSLPEstimator):
         loss : float
             Cross-entropy loss
         """
-        # TODO: Implement cross-entropy loss
-        # Clip predictions to avoid log(0)
-        pass
+        y_pred_clipped = np.clip(y_pred, 1e-15, 1 - 1e-15)
+        return -np.mean(np.sum(y_true * np.log(y_pred_clipped), axis=1))
 
     def fit(
         self, X: NDArray[np.floating], y: NDArray[np.int_]
@@ -147,17 +123,18 @@ class SimpleSLPClassifier(BaseSLPEstimator):
         self : object
             Fitted estimator
         """
-        # TODO: Implement training loop
-        # 1. Set random seed if provided
-        # 2. (Bonus for multi-class) Identify unique classes and encode y
-        # 3. Initialize weights
-        # 4. For each iteration:
-        #    - Forward propagation
-        #    - Compute loss
-        #    - Backward propagation
-        #    - Update weights
-        #    - Store loss in loss_curve_
-        pass
+        if self.random_state is not None:
+            np.random.seed(self.random_state)
+
+        self.classes_ = np.unique(y)
+        n_classes = len(self.classes_)
+        self.n_outputs_ = n_classes
+        y_onehot = np.eye(n_classes)[np.searchsorted(self.classes_, y)]
+
+        self._initialize_weights(X.shape[1], n_classes)
+        self._run_training_loop(X, y_onehot)
+
+        return self
 
     def predict_proba(self, X: NDArray[np.floating]) -> NDArray[np.floating]:
         """
@@ -173,9 +150,8 @@ class SimpleSLPClassifier(BaseSLPEstimator):
         proba : array-like, shape (n_samples, n_classes)
             Class probabilities
         """
-        # TODO: Implement prediction
-        # Use forward propagation and return softmax output
-        pass
+        _, _, proba = self._forward_propagation(X)
+        return proba
 
     def predict(self, X: NDArray[np.floating]) -> NDArray[np.int_]:
         """
@@ -191,9 +167,8 @@ class SimpleSLPClassifier(BaseSLPEstimator):
         y_pred : array-like, shape (n_samples,)
             Predicted class labels
         """
-        # TODO: Implement prediction
-        # Get probabilities and return class with highest probability
-        pass
+        y_pred = self.classes_[np.argmax(self.predict_proba(X), axis=1)]
+        return y_pred
 
     def score(self, X: NDArray[np.floating], y: NDArray[np.int_]) -> float:
         """
@@ -211,5 +186,4 @@ class SimpleSLPClassifier(BaseSLPEstimator):
         score : float
             Mean accuracy
         """
-        # TODO: Implement accuracy computation
-        pass
+        return float(np.mean(self.predict(X) == y))

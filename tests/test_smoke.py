@@ -36,10 +36,10 @@ class TestClassifierSmoke:
     def test_fit_predict(self):
         X = np.random.randn(20, 3)
         y = np.random.randint(0, 2, 20)
-        clf = SimpleSLPClassifier(hidden_layer_size=5, max_iter=10, random_state=42)
+        clf = SimpleSLPClassifier(hidden_layer_sizes=(5,), max_iter=10, random_state=42)
         clf.fit(X, y)
         assert clf.predict(X).shape == (20,)
-        assert clf.W1_ is not None
+        assert len(clf.weights_) > 0
         assert len(clf.loss_curve_) > 0
 
 
@@ -49,10 +49,10 @@ class TestRegressorSmoke:
     def test_fit_predict(self):
         X = np.random.randn(20, 3)
         y = np.random.randn(20)
-        reg = SimpleSLPRegressor(hidden_layer_size=5, max_iter=10, random_state=42)
+        reg = SimpleSLPRegressor(hidden_layer_sizes=(5,), max_iter=10, random_state=42)
         reg.fit(X, y)
         predictions = reg.predict(X)
         assert predictions.shape == (20,)
         assert np.all(np.isfinite(predictions))
-        assert reg.W1_ is not None
+        assert len(reg.weights_) > 0
         assert len(reg.loss_curve_) > 0
