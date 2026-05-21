@@ -97,7 +97,7 @@ Key design decisions:
 - `BaseSLPEstimator` uses the Template Method pattern — `_run_training_loop`, `_forward_hidden_layers`, and `_backward_propagation` are concrete shared helpers; `_forward_propagation`, `_compute_loss`, `fit`, `predict`, and `score` are abstract and implemented by each subclass.
 - Weights are stored as `list[NDArray]` to support arbitrary depth (`hidden_layer_sizes` is a tuple of ints).
 - Backward propagation uses the same `delta = y_pred - y` expression for both tasks because softmax + cross-entropy and linear + MSE both simplify to this gradient at the output layer.
-- Xavier (Glorot) initialisation: `W ~ N(0, sqrt(2 / (fan_in + fan_out)))`.
+- He (Kaiming) initialisation: `W ~ N(0, sqrt(2 / fan_in))` — optimal for ReLU activations.
 
 ---
 
@@ -107,14 +107,14 @@ Full results are in [`report.ipynb`](report.ipynb). All models are trained with 
 
 ### Regression
 
-Both the Diabetes and California Housing datasets are evaluated with training loss curves, predicted vs. actual scatter plots (with a perfect-prediction line and line of best fit), and an error metrics table reporting MSE, RMSE, MAE, and R² in original target units.
+Both the Diabetes and California Housing datasets are evaluated with training loss curves, predicted vs. actual scatter plots (with a perfect-prediction line and line of best fit), an error metrics table reporting MSE, RMSE, MAE, and R² in original target units, residual scatter plots, residual distributions, and learning curves.
 
 ### Classification
 
-The Breast Cancer (binary) and Digits (10-class) datasets are evaluated with training loss curves, confusion matrices, per-class classification reports (precision, recall, F1), confidence distribution histograms comparing correct vs. misclassified samples, and misclassification tables showing the true label, predicted label, and model confidence for each error.
+The Breast Cancer (binary) and Digits (10-class) datasets are evaluated with training loss curves, confusion matrices, per-class classification reports (precision, recall, F1), log loss, confidence distribution histograms comparing correct vs. misclassified samples, misclassification tables showing the true label, predicted label, and model confidence for each error, ROC curves with AUC, precision-recall curves with average precision, calibration curves, and learning curves.
 
 ### Evaluation Methodology
 
-- Regression: R² (coefficient of determination) and MSE/RMSE/MAE in original target units
-- Classification: accuracy, precision, recall, F1-score (per class and macro-averaged), confusion matrix
+- Regression: R² (coefficient of determination), MSE/RMSE/MAE in original target units, residual scatter plots, residual distributions, and learning curves (Train R² vs Test R² across training set sizes)
+- Classification: accuracy, precision, recall, F1-score (per class and macro-averaged), log loss, confusion matrix, ROC/AUC, precision-recall curves, calibration curves, and learning curves (Train vs Test accuracy across training set sizes)
 - All results use an 80/20 train/test split with `random_state=42`
